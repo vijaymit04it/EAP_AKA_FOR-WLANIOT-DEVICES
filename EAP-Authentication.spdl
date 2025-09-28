@@ -1,0 +1,171 @@
+// EAP Authentication Protocol
+
+hashfunction h;
+const XOR: Function;
+const plus: Function;
+usertype TimeStamp;
+usertype Key;
+
+
+protocol EAP(D,AP,AS)
+{
+    // Role: Device (D)
+    role D{
+        const IDd, IDas, IDap, pswd, LIAd, ET, MId, MSID, TID, ETFR, MKS, SI, Ii, MIDNew, MSIDNew, TSK,SK,IuN,Knew;
+        // IdofDevice, IdofAuthenticationServer, IdofAccessPoint, Password, LifetimeofDevice, ExpiryTime, MessageId, SessionId, TransactionId, ExpiryTimeForRekeying, MasterKey, SessionKey, IdentityofDevice, NewMessageId, NewSessionId
+
+        fresh T1: TimeStamp;
+        fresh Nc,R1: Nonce;
+
+        macro Ii = h(plus(pswd, IDd));
+        macro Iu = h(XOR(Ii,R1));
+
+        send_1(D,AP,
+            {plus(Iu,MSID,Nc,T1,R1, LIAd)} k,
+            h(Iu,MSID,Nc,T1,R1, LIAd)
+        );
+
+        
+        var T3: TimeStamp;
+        var Nd,R2: Nonce;
+        
+        macro MIDNew = {plus(MId,R2)} MKS;
+        macro IuN = h(XOR(Ii,R2,R1));
+
+        macro MSIDNew = XOR(MSID,R2);
+
+        macro Knew = h(XOR(k,Nc));
+        macro SK = XOR(Knew,Nd);
+        
+        recv_4(AP,D,
+            {plus(IuN,MIDNew,MSIDNew,Nd,T3,R2, TSK)} Knew,
+            h(plus(IuN,MIDNew,MSIDNew,Nd,T3,TSK, {MIDNew} SK))
+        );
+
+
+
+        // Security claims for Device
+        claim_i1(D, Secret, Nc);  // Claim: Nonce Na is secret
+        claim_i2(D, Secret, Nd);  // Claim: Nonce Na is secret
+        claim_i9(D, Secret, R1);  // Claim: Nonce Na is secret
+        claim_i12(D, Secret, SK);  // Claim: Nonce Na is secret
+
+        claim_i6(D, Weakagree);   // Claim: Weak agreement
+        claim_i8(D, Alive);       // Claim: Device is alive
+        claim_j1(D, Niagree);     // Claim: Nonce agreement
+        claim_j2(D, Nisynch);     // Claim: Nonce synchronization
+        
+
+
+    }
+    // Role: Acess Point (AP)
+    role AP{
+        const IDd, IDas, IDap, pswd, LIAd, ET, MId, MSID, TID, ETFR, MKS, SI, Ii, MIDNew, MSIDNew, TSK,SK,IuN,Knew;
+
+        var T1: TimeStamp;
+        var Nc,R1: Nonce;
+
+        recv_1(D,AP,
+            {plus(Iu,MSID,Nc,T1,R1, LIAd)} k,
+            h(Iu,MSID,Nc,T1,R1, LIAd)
+        );
+
+        
+        send_2(AP,AS,
+            {plus(Iu,MSID,Nc,T1,R1, LIAd)} k,
+            h(Iu,MSID,Nc,T1,R1, LIAd)
+        );
+
+        var T3: TimeStamp;
+        var Nd,R2: Nonce;
+        
+        macro MIDNew = {plus(MId,R2)} MKS;
+        macro IuN = h(XOR(Ii,R2,R1));
+
+        macro MSIDNew = XOR(MSID,R2);
+
+        macro Knew = h(XOR(k,Nc));
+        macro SK = XOR(Knew,Nd);
+
+        // macro MId = MIDNew;
+        // macro MSID = MSIDNew;
+        // k = Knew;
+        // R1 = R2;
+        
+
+        recv_3(AS,AP,
+            {plus(IuN,MIDNew,MSIDNew,Nd,T3,R2, TSK)} Knew,
+            {MIDNew} SK,
+            h(plus(IuN,MIDNew,MSIDNew,Nd,T3,TSK, {MIDNew} SK)),
+            ETFR,
+            TSK
+        );
+
+        
+        send_4(AP,D,
+            {plus(IuN,MIDNew,MSIDNew,Nd,T3,R2, TSK)} Knew,
+            h(plus(IuN,MIDNew,MSIDNew,Nd,T3,TSK, {MIDNew} SK))
+        );
+        
+
+        // Security claims for Access Point
+        claim_i3(AP, Secret, Nc);  // Claim: Nonce Na is secret
+        claim_i4(AP, Secret, Nd);  // Claim: Nonce Na is secret
+        claim_i10(AP, Secret, R2);  // Claim: Nonce Na is secret
+        claim_i11(AP, Secret, SK);  // Claim: Nonce Na is secret
+
+        claim_i11(AP, Weakagree);  // Claim: Weak agreement
+        claim_i12(AP, Alive);      // Claim: Authentication Server is alive
+        claim_j12(AP, Niagree);    // Claim: Nonce agreement
+        claim_j22(AP, Nisynch);    // Claim: Nonce synchronization
+        
+
+    }
+    // Role: Authentication Server (AS)
+    role AS{
+        const IDd, IDas, IDap, pswd, LIAd, ET, MId, MSID, TID, ETFR, MKS, SI, Ii, MIDNew, MSIDNew,TSK,SK,Knew;
+
+        var T1: TimeStamp;
+        var R1,Nc: Nonce;
+
+        recv_2(AP,AS,
+            {plus(Iu,MSID,Nc,T1,R1, LIAd)} k,
+            h(Iu,MSID,Nc,T1,R1, LIAd)
+        );
+
+        fresh T3: TimeStamp;
+        fresh Nd,R2: Nonce;
+
+        macro MIDNew = {plus(MId,R2)} MKS;
+        macro IuN = h(XOR(Ii,R2,R1));
+
+        macro MSIDNew = XOR(MSID,R2);
+
+        macro Knew = h(XOR(k,Nc));
+        macro SK = XOR(Knew,Nd);
+
+        send_3(AS,AP,
+            {plus(IuN,MIDNew,MSIDNew,Nd,T3,R2, TSK)} Knew,
+            {MIDNew} SK,
+            h(plus(IuN,MIDNew,MSIDNew,Nd,T3,TSK, {MIDNew} SK)),
+            ETFR,
+            TSK
+        );
+
+
+        
+        // Security claims for Authentication Server
+        claim_i5(AS, Secret, Nc);  // Claim: Nonce Na is secret
+        claim_i6(AS, Secret, Nd);  // Claim: Nonce Na is secret
+        claim_i10(AS, Secret, R2);  // Claim: Nonce Na is secret
+        claim_i11(AS, Secret, SK);  // Claim: Nonce Na is secret
+
+        claim_i19(AS, Weakagree);  // Claim: Weak agreement
+        claim_i20(AS, Alive);      // Claim: Authentication Server is alive
+        claim_j13(AS, Niagree);    // Claim: Nonce agreement
+        claim_j23(AS, Nisynch);    // Claim: Nonce synchronization
+
+    }
+
+
+}

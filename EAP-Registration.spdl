@@ -1,0 +1,84 @@
+// EAP Registration Phase Protocol
+
+hashfunction h;
+const XOR: Function;
+const plus: Function;
+usertype TimeStamp;
+usertype Key;
+
+protocol EAP(D,AS)
+{
+    // Role: Device (D)
+    role D
+    {
+        const IDd, IDas, IDap, pswd, LIAd, ET, MId, MSID, TID, ETFR, MKS, SI, Ii, MIDNew, MSIDNew;
+        // IdofDevice, IdofAuthenticationServer, IdofAccessPoint, Password, LifetimeofDevice, ExpiryTime, MessageId, SessionId, TransactionId, ExpiryTimeForRekeying, MasterKey, SessionKey, IdentityofDevice, NewMessageId, NewSessionId
+
+        // Fresh variables for timestamps and nonces
+        fresh T1, T4: TimeStamp;
+        fresh Na: Nonce;
+        var Nb, r1: Nonce;
+        var T2, T3: TimeStamp;
+
+        // Macro definition for Ii
+        macro Ii = h(plus(pswd, IDd));
+
+        // Step 1: Device sends a request to the Authentication Server (AS)
+        send_1(D, AS,
+               {plus(Ii, Na, T1, ET, LIAd, TID)} pk(AS),
+               h(plus(Ii, Na, T1, ET, LIAd, TID))
+        );
+
+        // Step 2: Device receives a response from the Authentication Server
+        recv_2(AS, D,
+               {plus({plus (Ii, r1)} MKS, {plus(IDas, r1)} MKS, Nb, T3)} Na,
+               h(plus({plus (Ii, r1)} MKS, {plus(IDas, r1)} MKS, Nb, T3))
+        );
+
+        // Security claims for Device
+        claim_i1(D, Secret, Na);  // Claim: Nonce Na is secret
+        claim_i1(D, Secret, Nb);  // Claim: Nonce Nb is secret
+
+        claim_i6(D, Weakagree);   // Claim: Weak agreement
+        claim_i8(D, Alive);       // Claim: Device is alive
+        claim_j1(D, Niagree);     // Claim: Nonce agreement
+        claim_j2(D, Nisynch);     // Claim: Nonce synchronization
+    }
+
+    // Role: Authentication Server (AS)
+    role AS
+    {
+        const IDd, IDas, IDap, pswd, LIAd, ET, MId, MSID, TID, ETFR, MKS, SI, Ii, MIDNew, MSIDNew;
+
+        // Variables for timestamps and nonces
+        var T1, T4: TimeStamp;
+        var Na: Nonce;
+        fresh T2, T3: TimeStamp;
+        fresh Nb, r1: Nonce;
+
+        // Step 1: Authentication Server receives a request from the Device
+        recv_1(D, AS,
+               {plus(Ii, Na, T1, ET, LIAd, TID)} pk(AS),
+               h(plus(Ii, Na, T1, ET, LIAd, TID))
+        );
+
+        // Macro definitions
+        macro K = h(XOR(Na, Nb));  // Session key generation
+
+        // Step 2: Authentication Server sends a response to the Device
+        send_2(AS, D,
+               {plus({plus (Ii, r1)} MKS, {plus(IDas, r1)} MKS, Nb, T3)} Na,
+               h(plus({plus (Ii, r1)} MKS, {plus(IDas, r1)} MKS, Nb, T3))
+        );
+
+        // Security claims for Authentication Server
+        claim_i7(AS, Secret, Na);  // Claim: Nonce Na is secret
+        claim_i8(AS, Secret, Nb);  // Claim: Nonce Nb is secret
+
+        claim_i11(AS, Weakagree);  // Claim: Weak agreement
+        claim_i12(AS, Alive);      // Claim: Authentication Server is alive
+        claim_i18(AS, Alive);      // Claim: Authentication Server is alive
+        claim_j11(AS, Niagree);    // Claim: Nonce agreement
+        claim_j21(AS, Nisynch);    // Claim: Nonce synchronization
+    }
+}
